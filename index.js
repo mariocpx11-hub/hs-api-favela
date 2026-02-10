@@ -1,5 +1,5 @@
 const express = require('express');
-const axios = require('axios'); // Vamos usar axios para buscar dados de fora
+const axios = require('axios'); 
 const app = express();
 
 app.get('/api/account', async (req, res) => {
@@ -11,15 +11,14 @@ app.get('/api/account', async (req, res) => {
     }
 
     try {
-        // Tentando buscar dados de um servidor de consulta real
-        // Nota: Se este link cair, avisar para trocarmos a fonte
+        // Esta linha faz a busca real do jogador
         const response = await axios.get(`https://freefireapi.com.br/api/info_player/${uid}?region=${region}`);
         
-        // Retornamos exatamente o que o seu código Java espera ler
+        // Retorna os dados reais para o seu App ADJUSTE
         res.json(response.data);
 
     } catch (error) {
-        // Se a consulta real falhar, mandamos o "Modo Offline" para o app não crashar
+        // Se o servidor de consulta estiver fora ou o UID não existir
         res.json({
             basicInfo: {
                 nickname: "ID NAO ENCONTRADO",
