@@ -4,62 +4,63 @@ const app = express();
 
 app.get('/api/account', async (req, res) => {
     const { uid } = req.query;
-    const region = req.query.region || 'br';
+    
+    // Lista de regiões do seu último código
+    const regioes = ["br", "us", "ind", "ru", "sg", "me", "cis", "id", "th", "vn", "tw", "eu"];
 
     if (!uid) {
         return res.status(400).json({ error: "UID obrigatorio" });
     }
 
-    // Lista de servidores de consulta para tentar um por um
-    const servers = [
-        `https://ff-api-001.vercel.app/api/info?uid=${uid}&region=${region}`,
-        `https://freefireapi.com.br/api/info_player/${uid}?region=${region}`
-    ];
+    let finalData = null;
 
-    let data = null;
-
-    // Loop que tenta nos servidores até conseguir um resultado real
-    for (const url of servers) {
+    // Tenta encontrar o UID em cada região, uma por uma
+    for (const r of regioes) {
         try {
-            const response = await axios.get(url, { timeout: 5000 });
-            // Verifica se o nickname existe e não é erro
-            if (response.data && response.data.basicInfo && response.data.basicInfo.nickname) {
-                data = response.data;
-                break; // Achou os dados! Para de procurar.
+            // Testamos dois servidores diferentes para cada região
+            const urls = [
+                `https://ff-api-001.vercel.app/api/info?uid=${uid}&region=${r}`,
+                `https://freefireapi.com.br/api/info_player/${uid}?region=${r}`
+            ];
+
+            for (const url of urls) {
+                const response = await axios.get(url, { timeout: 3000 });
+                
+                // Se o nickname for válido e não for erro, achamos!
+                if (response.data && response.data.basicInfo && response.data.basicInfo.nickname && !response.data.basicInfo.nickname.includes("NAO ENCONTRADO")) {
+                    finalData = response.data;
+                    break; 
+                }
             }
+            if (finalData) break; // Se achou em uma região, para de procurar nas outras
         } catch (e) {
-            continue; // Falhou esse servidor? Tenta o próximo.
+            continue; // Se der erro em uma região, pula para a próxima
         }
     }
 
-    if (data) {
-        res.json(data);
+    if (finalData) {
+        res.json(finalData);
     } else {
-        // Se nenhum servidor encontrar o jogador
+        // Se percorrer tudo e não achar nada
         res.json({
             basicInfo: {
-                nickname: "NOME NÃO LOCALIZADO",
+                nickname: "ID NÃO LOCALIZADO",
                 level: 0,
                 liked: 0,
-                region: region.toUpperCase(),
+                region: "OFFLINE",
                 rankingPoints: 0,
                 csRankingPoints: 0,
                 exp: 0,
                 createAt: 0,
                 badgeCnt: 0
             },
-            clanBasicInfo: {
-                clanName: "Sem Guilda",
-                clanId: "0"
-            },
-            socialInfo: {
-                signature: "Verifique o UID e tente novamente."
-            }
+            clanBasicInfo: { clanName: "Sem Guilda", clanId: "0" },
+            socialInfo: { signature: "UID inexistente ou servidor instável." }
         });
     }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`API HS Favela online na porta ${PORT}`);
+    console.log(`API HS Favela Multiregião online`);
 });
