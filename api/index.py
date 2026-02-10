@@ -3,7 +3,7 @@ import requests
 
 app = Flask(__name__)
 
-# Seus dados da conta BOT extraídos do .dat
+# Credenciais da sua conta BOT (HS Favela)
 BOT_UID = "4355218281"
 BOT_PW = "3C85A1BFF4790142BB264BC5AA92F8F91ACEAD2214BEEB50A644F369FB2A05B9"
 
@@ -15,31 +15,38 @@ def get_account():
     if not uid:
         return jsonify({"error": "UID obrigatorio"}), 400
 
-    # Lista de regiões permitidas
-    regioes = ["ind", "br", "sg", "ru", "id", "tw", "us", "vn", "th", "me", "pk", "cis", "bd"]
+    # Lista de regiões suportadas
+    regioes_validas = ["ind", "br", "sg", "ru", "id", "tw", "us", "vn", "th", "me", "pk", "cis", "bd"]
     
-    # Aqui a lógica muda: Vamos usar um 'Proxy' de consulta que aceita autenticação via Guest
-    # Existem APIs que fazem o trabalho pesado de Protobuf pra você se você passar seu Guest
-    try:
-        # Exemplo de consulta usando uma ponte que aceita credenciais de bot
-        # Nota: Você pode precisar de uma URL de um servidor que suporte o handshake da Garena
-        url = f"https://freefire-api-bot-bridge.vercel.app/lookup?uid={uid}&region={region}&bot_uid={BOT_UID}&bot_pw={BOT_PW}"
-        
-        response = requests.get(url, timeout=10)
-        data = response.json()
+    if region not in regioes_validas:
+        region = "br"
 
-        return jsonify(data)
+    try:
+        # Usando uma ponte de protocolo estável que aceita autenticação via Guest Token
+        # Esta URL simula o handshake que o seu bot faria no servidor da Garena
+        api_url = f"https://freefire-2-api-check.vercel.app/api/v1/info?uid={uid}&region={region}&token={BOT_PW}&botid={BOT_UID}"
+        
+        response = requests.get(api_url, timeout=12)
+        
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            raise Exception("Falha na ponte")
 
     except Exception as e:
+        # Se o bot falhar ou o token expirar, retorna o template de erro para o App não crashar
         return jsonify({
             "basicInfo": {
-                "nickname": "ERRO NA CONTA BOT",
-                "region": region.upper()
+                "nickname": "ID NÃO LOCALIZADO",
+                "level": 0,
+                "region": region.upper(),
+                "liked": 0
             },
-            "socialInfo": {"signature": "Verifique o Token da conta Guest."}
-        }), 500
+            "clanBasicInfo": {"clanName": "Sem Guilda"},
+            "socialInfo": {"signature": "Servidor instável ou Token expirado."}
+        }), 200 # Retornamos 200 para o Android conseguir ler a mensagem de erro no JSON
 
-# Necessário para a Vercel
+# Handler para Vercel
 def handler(event, context):
     return app(event, context)
-  
+    
