@@ -5,8 +5,8 @@ const app = express();
 app.get('/api/account', async (req, res) => {
     const { uid } = req.query;
     
-    // Lista de regiões do seu último código
-    const regioes = ["br", "us", "ind", "ru", "sg", "me", "cis", "id", "th", "vn", "tw", "eu"];
+    // As 13 regiões que você confirmou que funcionam
+    const regioes = ["ind", "br", "sg", "ru", "id", "tw", "us", "vn", "th", "me", "pk", "cis", "bd"];
 
     if (!uid) {
         return res.status(400).json({ error: "UID obrigatorio" });
@@ -14,53 +14,52 @@ app.get('/api/account', async (req, res) => {
 
     let finalData = null;
 
-    // Tenta encontrar o UID em cada região, uma por uma
     for (const r of regioes) {
         try {
-            // Testamos dois servidores diferentes para cada região
+            // Lista de APIs de consulta (fontes diferentes)
             const urls = [
-                `https://ff-api-001.vercel.app/api/info?uid=${uid}&region=${r}`,
-                `https://freefireapi.com.br/api/info_player/${uid}?region=${r}`
+                `https://freefireapi.com.br/api/info_player/${uid}?region=${r}`,
+                `https://ff-api-001.vercel.app/api/info?uid=${uid}&region=${r}`
             ];
 
             for (const url of urls) {
-                const response = await axios.get(url, { timeout: 3000 });
-                
-                // Se o nickname for válido e não for erro, achamos!
-                if (response.data && response.data.basicInfo && response.data.basicInfo.nickname && !response.data.basicInfo.nickname.includes("NAO ENCONTRADO")) {
-                    finalData = response.data;
-                    break; 
+                try {
+                    const response = await axios.get(url, { timeout: 4000 });
+                    const data = response.data;
+
+                    // Validação pesada: Só aceita se tiver nickname REAL
+                    if (data && data.basicInfo && data.basicInfo.nickname) {
+                        const nick = data.basicInfo.nickname.toUpperCase();
+                        
+                        // Se o nick NÃO contiver mensagens de erro, nós achamos!
+                        if (!nick.includes("NÃO ENCONTRADO") && !nick.includes("NAO ENCONTRADO") && !nick.includes("NOT FOUND") && !nick.includes("ERRO")) {
+                            finalData = data;
+                            finalData.basicInfo.region = r.toUpperCase(); // Força a região correta no JSON
+                            break;
+                        }
+                    }
+                } catch (err) {
+                    continue; // Se uma URL falhar, tenta a próxima do array 'urls'
                 }
             }
-            if (finalData) break; // Se achou em uma região, para de procurar nas outras
+            if (finalData) break; // Se achou o jogador, para de percorrer as regiões
         } catch (e) {
-            continue; // Se der erro em uma região, pula para a próxima
+            continue; 
         }
     }
 
     if (finalData) {
         res.json(finalData);
     } else {
-        // Se percorrer tudo e não achar nada
-        res.json({
+        res.status(404).json({
             basicInfo: {
                 nickname: "ID NÃO LOCALIZADO",
                 level: 0,
-                liked: 0,
-                region: "OFFLINE",
-                rankingPoints: 0,
-                csRankingPoints: 0,
-                exp: 0,
-                createAt: 0,
-                badgeCnt: 0
+                region: "OFFLINE"
             },
-            clanBasicInfo: { clanName: "Sem Guilda", clanId: "0" },
-            socialInfo: { signature: "UID inexistente ou servidor instável." }
+            socialInfo: { signature: "Nenhuma das 13 regiões retornou este UID." }
         });
     }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`API HS Favela Multiregião online`);
-});
+module.exports = app; // Importante para a Vercel
